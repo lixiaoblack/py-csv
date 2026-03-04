@@ -91,16 +91,20 @@ def fetch_month_list(cookie, quark_s_monthly, user_id):
             "metaObjName": "Attendance.Monthly",
             "searchView": "Attendance.MyMonthlySearchForm",
             "items": [
-                {"name": "Attendance.Monthly.UserId", "text": "", "value": user_id, "num": "2"},
-                {"name": "Attendance.Monthly.StdIsDeleted", "text": "否", "value": "0", "num": "4"},
-                {"name": "Attendance.Monthly.MonthlyDataType", "text": "明细", "value": "2", "num": "5"}
+                {"name": "Attendance.Monthly.UserId",
+                    "text": "", "value": user_id, "num": "2"},
+                {"name": "Attendance.Monthly.StdIsDeleted",
+                    "text": "否", "value": "0", "num": "4"},
+                {"name": "Attendance.Monthly.MonthlyDataType",
+                    "text": "明细", "value": "2", "num": "5"}
             ],
             "searchFormFilterJson": None
         }
     }
 
     try:
-        resp = requests.post(url, headers=get_headers(cookie), params=params, json=payload, timeout=30)
+        resp = requests.post(url, headers=get_headers(
+            cookie), params=params, json=payload, timeout=30)
         print(f"   状态码: {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
@@ -166,7 +170,7 @@ def fetch_daily_detail(cookie, quark_s_daily, month_id):
             "ext_data": {"ListViewLabel": "日出勤情况列表"},
             "isEnableGlobleCheck": False,
             "hasRowHandler": False,
-            "paging": {"total": 0, "capacity": 30, "page": 0, "capacityList": [15, 30, 60, 100]},
+            "paging": {"total": 0, "capacity": 100, "page": 0, "capacityList": [15, 30, 60, 100]},
             "isAvatars": True,
             "viewName": "Attendance.SingleObjectListView.AttendanceDetailListView",
             "operateColumWidth": 140,
@@ -190,7 +194,8 @@ def fetch_daily_detail(cookie, quark_s_daily, month_id):
     }
 
     try:
-        resp = requests.post(url, headers=get_headers(cookie), params=params, json=payload, timeout=30)
+        resp = requests.post(url, headers=get_headers(
+            cookie), params=params, json=payload, timeout=30)
         print(f"      状态码: {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
@@ -227,7 +232,7 @@ def fetch_swiping_card_records(cookie, quark_s_statistics, user_id, month, dates
             "hasCheckColumn": True,
             "isEnableGlobleCheck": False,
             "hasRowHandler": True,
-            "paging": {"capacity": "15", "page": "0", "total": 0, "capacityList": [15, 30, 60, 100]},
+            "paging": {"capacity": 100, "page": "0", "total": 0, "capacityList": [15, 30, 60, 100]},
             "isAvatars": True,
             "viewName": "Attendance.SingleObjectListView.MyStatisticsEmpAttendanceDataList",
             "metaObjName": "Attendance.AttendanceStatistics",
@@ -240,14 +245,16 @@ def fetch_swiping_card_records(cookie, quark_s_statistics, user_id, month, dates
                 {"name": "Attendance.AttendanceStatistics.StaffId", "value": user_id},
                 {"name": "Attendance.AttendanceStatistics.StdIsDeleted", "value": "0"},
                 {"name": "Attendance.AttendanceStatistics.Status", "value": "1"},
-                {"name": "Attendance.AttendanceStatistics.SwipingCardDate", "value": dates_str}
+                {"name": "Attendance.AttendanceStatistics.SwipingCardDate",
+                    "value": dates_str}
             ],
             "searchFormFilterJson": None
         }
     }
 
     try:
-        resp = requests.post(url, headers=get_headers(cookie), params=params, json=payload, timeout=30)
+        resp = requests.post(url, headers=get_headers(
+            cookie), params=params, json=payload, timeout=30)
         print(f"      状态码: {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
@@ -472,7 +479,8 @@ def main():
 
     # 1. 获取月份列表和月报汇总
     print("\n📅 步骤1: 获取月份列表和月报汇总...")
-    months, monthly_records, month_ids = fetch_month_list(cookie, quark_s, user_id)
+    months, monthly_records, month_ids = fetch_month_list(
+        cookie, quark_s, user_id)
     print(f"   找到 {len(months)} 个月份")
     print(f"   月报汇总: {len(monthly_records)} 条")
 
@@ -486,7 +494,8 @@ def main():
     print("\n📅 步骤2: 获取每日明细...")
     for month in months:
         month_id = month_ids.get(month, "")
-        print(f"\n📊 正在处理 {month}... (ID: {month_id[:8] if month_id else 'N/A'}...)")
+        print(
+            f"\n📊 正在处理 {month}... (ID: {month_id[:8] if month_id else 'N/A'}...)")
 
         if not month_id:
             print("   ❌ 无ID，跳过")
@@ -519,7 +528,8 @@ def main():
             print("   ❌ 无日期数据，跳过")
             continue
         print(f"   出勤日期: {len(dates)} 天")
-        swiping_records = fetch_swiping_card_records(cookie, quark_s, user_id, month, dates)
+        swiping_records = fetch_swiping_card_records(
+            cookie, quark_s, user_id, month, dates)
         all_swiping_cards.extend(swiping_records)
 
     # 4. 生成文件
