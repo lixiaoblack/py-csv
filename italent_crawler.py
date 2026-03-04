@@ -413,16 +413,12 @@ def interactive_input():
 
     cookie = input("\n请输入 Cookie: ").strip()
     user_id = input("请输入用户ID: ").strip()
-    quark_s_monthly = input("请输入月报列表的 quark_s: ").strip()
-    quark_s_daily = input("请输入每日明细的 quark_s: ").strip()
-    quark_s_statistics = input("请输入打卡记录的 quark_s: ").strip()
+    quark_s = input("请输入 quark_s: ").strip()
 
     config = {
         "cookie": cookie,
         "user_id": user_id,
-        "quark_s_monthly": quark_s_monthly,
-        "quark_s_daily": quark_s_daily,
-        "quark_s_statistics": quark_s_statistics
+        "quark_s": quark_s
     }
 
     save = input("\n是否保存配置供下次使用? (y/n): ").strip().lower()
@@ -450,11 +446,9 @@ def main():
 
     cookie = config.get("cookie", "")
     user_id = config.get("user_id", "")
-    quark_s_monthly = config.get("quark_s_monthly", "")
-    quark_s_daily = config.get("quark_s_daily", "")
-    quark_s_statistics = config.get("quark_s_statistics", "")
+    quark_s = config.get("quark_s", "")
 
-    if not cookie or not quark_s_monthly or not quark_s_daily:
+    if not cookie or not quark_s:
         print("❌ 配置不完整，请重新输入")
         return
 
@@ -462,7 +456,7 @@ def main():
 
     # 1. 获取月份列表和月报汇总
     print("\n📅 步骤1: 获取月份列表和月报汇总...")
-    months, monthly_records, month_ids = fetch_month_list(cookie, quark_s_monthly, user_id)
+    months, monthly_records, month_ids = fetch_month_list(cookie, quark_s, user_id)
     print(f"   找到 {len(months)} 个月份")
     print(f"   月报汇总: {len(monthly_records)} 条")
 
@@ -482,36 +476,35 @@ def main():
             print("   ❌ 无ID，跳过")
             continue
 
-        daily_records = fetch_daily_detail(cookie, quark_s_daily, month_id)
+        daily_records = fetch_daily_detail(cookie, quark_s, month_id)
         all_daily.extend(daily_records)
         print(f"   明细: {len(daily_records)} 条")
 
     # 3. 获取打卡记录
     all_swiping_cards = []
-    if quark_s_statistics:
-        print("\n📅 步骤3: 获取打卡记录...")
-        daily_by_month = {}
-        for record in all_daily:
-            date_val = record.get("Date", {})
-            if isinstance(date_val, dict):
-                date_str = date_val.get("value", "") or date_val.get("text", "")
-            else:
-                date_str = date_val
-            if date_str:
-                month_key = date_str[:7].replace("/", "-")
-                if month_key not in daily_by_month:
-                    daily_by_month[month_key] = []
-                daily_by_month[month_key].append(record)
+    print("\n📅 步骤3: 获取打卡记录...")
+    daily_by_month = {}
+    for record in all_daily:
+        date_val = record.get("Date", {})
+        if isinstance(date_val, dict):
+            date_str = date_val.get("value", "") or date_val.get("text", "")
+        else:
+            date_str = date_val
+        if date_str:
+            month_key = date_str[:7].replace("/", "-")
+            if month_key not in daily_by_month:
+                daily_by_month[month_key] = []
+            daily_by_month[month_key].append(record)
 
-        for month, daily_records in daily_by_month.items():
-            print(f"\n📊 正在处理 {month} 的打卡记录...")
-            dates = extract_dates_from_daily(daily_records)
-            if not dates:
-                print("   ❌ 无日期数据，跳过")
-                continue
-            print(f"   出勤日期: {len(dates)} 天")
-            swiping_records = fetch_swiping_card_records(cookie, quark_s_statistics, user_id, month, dates)
-            all_swiping_cards.extend(swiping_records)
+    for month, daily_records in daily_by_month.items():
+        print(f"\n📊 正在处理 {month} 的打卡记录...")
+        dates = extract_dates_from_daily(daily_records)
+        if not dates:
+            print("   ❌ 无日期数据，跳过")
+            continue
+        print(f"   出勤日期: {len(dates)} 天")
+        swiping_records = fetch_swiping_card_records(cookie, quark_s, user_id, month, dates)
+        all_swiping_cards.extend(swiping_records)
 
     # 4. 生成文件
     print("\n💾 步骤4: 生成CSV文件...")
@@ -524,16 +517,14 @@ def main():
     save_month_list_csv(months, month_list_file)
     save_monthly_csv(monthly_records, monthly_file)
     save_daily_csv(all_daily, daily_file)
-    if all_swiping_cards:
-        save_swiping_card_csv(all_swiping_cards, swiping_file)
+    save_swiping_card_csv(all_swiping_cards, swiping_file)
 
     print("\n" + "=" * 70)
     print("✅ 全部完成！")
     print(f"   月份列表: {len(months)} 个月")
     print(f"   月报汇总: {len(monthly_records)} 条记录")
     print(f"   每日明细: {len(all_daily)} 条记录")
-    if all_swiping_cards:
-        print(f"   打卡记录: {len(all_swiping_cards)} 条记录")
+    print(f"   打卡记录: {len(all_swiping_cards)} 条记录")
     print("=" * 70)
 
     input("\n按回车键退出...")
