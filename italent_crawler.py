@@ -405,6 +405,16 @@ def extract_dates_from_daily(daily_records):
     return dates
 
 
+def extract_user_id_from_cookie(cookie):
+    """从 Cookie 中提取用户ID"""
+    import re
+    # Cookie 格式: key-154722667=false; ...
+    match = re.search(r'key-(\d+)=', cookie)
+    if match:
+        return match.group(1)
+    return ""
+
+
 def interactive_input():
     """交互式输入配置"""
     print("\n" + "=" * 60)
@@ -412,8 +422,14 @@ def interactive_input():
     print("=" * 60)
 
     cookie = input("\n请输入 Cookie: ").strip()
-    user_id = input("请输入用户ID: ").strip()
     quark_s = input("请输入 quark_s: ").strip()
+
+    # 从 Cookie 中自动提取用户ID
+    user_id = extract_user_id_from_cookie(cookie)
+    if user_id:
+        print(f"自动识别用户ID: {user_id}")
+    else:
+        user_id = input("请输入用户ID: ").strip()
 
     config = {
         "cookie": cookie,
