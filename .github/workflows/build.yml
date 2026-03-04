@@ -43,11 +43,16 @@ jobs:
       run: |
         pyinstaller italent_crawler.py --name iTalent考勤爬虫 --onefile --console --clean --noconfirm
 
+    - name: Rename artifact
+      shell: bash
+      run: |
+        mv dist/${{ matrix.artifact_name }} dist/${{ matrix.asset_name }}
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.asset_name }}
-        path: dist/${{ matrix.artifact_name }}
+        path: dist/${{ matrix.asset_name }}
 
   release:
     name: Create Release
@@ -56,13 +61,26 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     
     steps:
-    - name: Download all artifacts
+    - name: Download Windows artifact
       uses: actions/download-artifact@v4
       with:
-        path: artifacts
+        name: iTalent考勤爬虫-Windows.exe
+        path: ./release
 
-    - name: Display structure of downloaded files
-      run: ls -R artifacts
+    - name: Download macOS artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: iTalent考勤爬虫-macOS
+        path: ./release
+
+    - name: Download Linux artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: iTalent考勤爬虫-Linux
+        path: ./release
+
+    - name: List files
+      run: ls -la ./release
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
@@ -81,7 +99,6 @@ jobs:
           - Windows: iTalent考勤爬虫-Windows.exe
           - macOS: iTalent考勤爬虫-macOS
           - Linux: iTalent考勤爬虫-Linux
-        files: |
-          artifacts/**/*
+        files: release/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
