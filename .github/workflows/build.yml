@@ -16,14 +16,14 @@ jobs:
         os: [windows-latest, macos-latest, ubuntu-latest]
         include:
           - os: windows-latest
-            artifact_name: iTalent考勤爬虫.exe
-            asset_name: iTalent考勤爬虫-Windows.exe
+            artifact_name: italent-crawler.exe
+            asset_name: italent-crawler-windows.exe
           - os: macos-latest
-            artifact_name: iTalent考勤爬虫
-            asset_name: iTalent考勤爬虫-macOS
+            artifact_name: italent-crawler
+            asset_name: italent-crawler-macos
           - os: ubuntu-latest
-            artifact_name: iTalent考勤爬虫
-            asset_name: iTalent考勤爬虫-Linux
+            artifact_name: italent-crawler
+            asset_name: italent-crawler-linux
 
     steps:
     - name: Checkout code
@@ -41,7 +41,7 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller italent_crawler.py --name iTalent考勤爬虫 --onefile --console --clean --noconfirm
+        pyinstaller italent_crawler.py --name italent-crawler --onefile --console --clean --noconfirm
 
     - name: Rename artifact
       shell: bash
@@ -64,19 +64,19 @@ jobs:
     - name: Download Windows artifact
       uses: actions/download-artifact@v4
       with:
-        name: iTalent考勤爬虫-Windows.exe
+        name: italent-crawler-windows.exe
         path: ./release
 
     - name: Download macOS artifact
       uses: actions/download-artifact@v4
       with:
-        name: iTalent考勤爬虫-macOS
+        name: italent-crawler-macos
         path: ./release
 
     - name: Download Linux artifact
       uses: actions/download-artifact@v4
       with:
-        name: iTalent考勤爬虫-Linux
+        name: italent-crawler-linux
         path: ./release
 
     - name: List files
@@ -88,17 +88,17 @@ jobs:
         tag_name: v1.0.${{ github.run_number }}
         name: Release v1.0.${{ github.run_number }}
         body: |
-          iTalent 考勤爬虫工具
+          iTalent Attendance Crawler
           
-          ## 使用方法
-          1. 下载对应平台的可执行文件
-          2. 运行程序，按提示输入 Cookie 和 quark_s
-          3. 等待爬取完成，生成 CSV 文件
+          ## Usage
+          1. Download the executable for your platform
+          2. Run the program and enter Cookie & quark_s
+          3. Wait for the crawl to complete, CSV files will be generated
           
-          ## 文件说明
-          - Windows: iTalent考勤爬虫-Windows.exe
-          - macOS: iTalent考勤爬虫-macOS
-          - Linux: iTalent考勤爬虫-Linux
+          ## Files
+          - Windows: italent-crawler-windows.exe
+          - macOS: italent-crawler-macos
+          - Linux: italent-crawler-linux
         files: release/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
