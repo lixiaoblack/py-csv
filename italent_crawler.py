@@ -2,6 +2,7 @@
 """
 iTalent 考勤数据爬取工具
 支持配置文件或交互式输入
+流程：获取月份列表 → 每日明细 → 打卡记录 → 生成CSV
 """
 
 import requests
@@ -48,7 +49,7 @@ def get_text(record, field, default=""):
     return default
 
 
-def fetch_month_list(cookie, quark_s_monthly):
+def fetch_month_list(cookie, quark_s_monthly, user_id):
     """获取月份列表和月报汇总"""
     url = "https://cloud.italent.cn/api/v2/UI/TableList"
     params = {
@@ -69,7 +70,7 @@ def fetch_month_list(cookie, quark_s_monthly):
             "ext_data": {"ListViewLabel": "我的月报列表"},
             "isEnableGlobleCheck": False,
             "hasRowHandler": True,
-            "paging": {"total": 0, "capacity": 15, "page": 0, "capacityList": [15, 30, 60, 100]},
+            "paging": {"total": 0, "capacity": 100, "page": 0, "capacityList": [15, 30, 60, 100]},
             "isAvatars": True,
             "viewName": "Attendance.SingleObjectListView.MyMonthlyTableList",
             "operateColumWidth": 140,
@@ -90,20 +91,16 @@ def fetch_month_list(cookie, quark_s_monthly):
             "metaObjName": "Attendance.Monthly",
             "searchView": "Attendance.MyMonthlySearchForm",
             "items": [
-                {"name": "Attendance.Monthly.UserId",
-                    "text": "", "value": "", "num": "2"},
-                {"name": "Attendance.Monthly.StdIsDeleted",
-                    "text": "否", "value": "0", "num": "4"},
-                {"name": "Attendance.Monthly.MonthlyDataType",
-                    "text": "明细", "value": "2", "num": "5"}
+                {"name": "Attendance.Monthly.UserId", "text": "", "value": user_id, "num": "2"},
+                {"name": "Attendance.Monthly.StdIsDeleted", "text": "否", "value": "0", "num": "4"},
+                {"name": "Attendance.Monthly.MonthlyDataType", "text": "明细", "value": "2", "num": "5"}
             ],
             "searchFormFilterJson": None
         }
     }
 
     try:
-        resp = requests.post(url, headers=get_headers(
-            cookie), params=params, json=payload, timeout=30)
+        resp = requests.post(url, headers=get_headers(cookie), params=params, json=payload, timeout=30)
         print(f"   状态码: {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
@@ -136,12 +133,12 @@ def fetch_month_list(cookie, quark_s_monthly):
                 with open("month_ids.json", "w") as f:
                     json.dump(month_ids, f)
 
-            return months, monthly_records
+            return months, monthly_records, month_ids
         else:
             print(f"   响应: {resp.text[:200]}")
     except Exception as e:
         print(f"获取月份列表失败: {e}")
-    return [], []
+    return [], [], {}
 
 
 def fetch_daily_detail(cookie, quark_s_daily, month_id):
@@ -193,8 +190,8 @@ def fetch_daily_detail(cookie, quark_s_daily, month_id):
     }
 
     try:
-        resp = requests.post(url, headers=get_headers(
-            cookie), params=params, json=payload, timeout=30)
+        resp = requests.post(url, headers=get_headers(cookie), params=params, json=payload, timeout=30)
+        print(f"      状态码: {resp.status_code}")
         if resp.status_code == 200:
             data = resp.json()
             records = data.get("cmp_data", {}).get("data", [])
@@ -202,9 +199,67 @@ def fetch_daily_detail(cookie, quark_s_daily, month_id):
                 records = data.get("biz_data", [])
             if not records:
                 records = data.get("rows", [])
+            print(f"      记录数: {len(records)}")
             return records
     except Exception as e:
         print(f"获取每日明细失败: {e}")
+    return []
+
+
+def fetch_swiping_card_records(cookie, quark_s_statistics, user_id, month, dates):
+    """获取打卡记录数据"""
+    url = "https://cloud.italent.cn/api/v2/UI/TableList"
+    params = {
+        "viewName": "Attendance.SingleObjectListView.MyStatisticsEmpAttendanceDataList",
+        "metaObjName": "Attendance.AttendanceStatistics",
+        "app": "Attendance",
+        "shadow_context": '{"appModel":"italent","uppid":"1"}',
+        "frontendVersion": "2025061300",
+        "_qsrcapp": "attendance",
+        "quark_s": quark_s_statistics
+    }
+
+    dates_str = ",".join(dates) if dates else ""
+
+    payload = {
+        "table_data": {
+            "advance": {"cmp_render": {"viewPath": "", "status": "enable"}, "layout": {}},
+            "hasCheckColumn": True,
+            "isEnableGlobleCheck": False,
+            "hasRowHandler": True,
+            "paging": {"capacity": "15", "page": "0", "total": 0, "capacityList": [15, 30, 60, 100]},
+            "isAvatars": True,
+            "viewName": "Attendance.SingleObjectListView.MyStatisticsEmpAttendanceDataList",
+            "metaObjName": "Attendance.AttendanceStatistics",
+            "isCustomListView": True
+        },
+        "search_data": {
+            "metaObjName": "Attendance.AttendanceStatistics",
+            "searchView": "Attendance.AttendanceStatisticsSearchView",
+            "items": [
+                {"name": "Attendance.AttendanceStatistics.StaffId", "value": user_id},
+                {"name": "Attendance.AttendanceStatistics.StdIsDeleted", "value": "0"},
+                {"name": "Attendance.AttendanceStatistics.Status", "value": "1"},
+                {"name": "Attendance.AttendanceStatistics.SwipingCardDate", "value": dates_str}
+            ],
+            "searchFormFilterJson": None
+        }
+    }
+
+    try:
+        resp = requests.post(url, headers=get_headers(cookie), params=params, json=payload, timeout=30)
+        print(f"      状态码: {resp.status_code}")
+        if resp.status_code == 200:
+            data = resp.json()
+            records = data.get("cmp_data", {}).get("data", [])
+            if not records:
+                records = data.get("biz_data", [])
+            if not records:
+                records = data.get("rows", [])
+            print(f"      打卡记录数: {len(records)}")
+            return records
+    except Exception as e:
+        print(f"获取打卡记录失败: {e}")
     return []
 
 
@@ -305,6 +360,51 @@ def save_daily_csv(all_records, filename):
     print(f"✅ 每日明细已保存: {filename} ({len(all_records)}条)")
 
 
+def save_swiping_card_csv(all_records, filename):
+    """保存打卡记录"""
+    fields = [
+        ("SwipingCardDate", "打卡日期"),
+        ("StaffId", "员工"),
+        ("DateType", "日期类型"),
+        ("OIdWorkShift", "班次"),
+        ("ActualForFirstCard", "首次打卡时间"),
+        ("ActualForLastCard", "最后打卡时间"),
+        ("WorkPeriod", "工作时段(小时)"),
+        ("AttendanceStatus", "考勤状态"),
+        ("AttendanceStatusDetail", "考勤状态详情"),
+        ("AbsenceDuration", "缺勤时长(分钟)"),
+        ("ModifiedTime", "最后修改时间"),
+    ]
+
+    with open(filename, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow([f[1] for f in fields])
+        for record in all_records:
+            row = []
+            for field, _ in fields:
+                value = get_text(record, field)
+                if field == "StaffId" and value:
+                    value = value.split("(")[0] if "(" in value else value
+                row.append(value)
+            writer.writerow(row)
+    print(f"✅ 打卡记录已保存: {filename} ({len(all_records)}条)")
+
+
+def extract_dates_from_daily(daily_records):
+    """从每日明细中提取出勤日期"""
+    dates = []
+    for record in daily_records:
+        date_val = record.get("Date", {})
+        if isinstance(date_val, dict):
+            date_str = date_val.get("value", "") or date_val.get("text", "")
+        else:
+            date_str = date_val
+        if date_str:
+            date_str = date_str.replace("/", "-")
+            dates.append(date_str)
+    return dates
+
+
 def interactive_input():
     """交互式输入配置"""
     print("\n" + "=" * 60)
@@ -312,13 +412,17 @@ def interactive_input():
     print("=" * 60)
 
     cookie = input("\n请输入 Cookie: ").strip()
+    user_id = input("请输入用户ID: ").strip()
     quark_s_monthly = input("请输入月报列表的 quark_s: ").strip()
     quark_s_daily = input("请输入每日明细的 quark_s: ").strip()
+    quark_s_statistics = input("请输入打卡记录的 quark_s: ").strip()
 
     config = {
         "cookie": cookie,
+        "user_id": user_id,
         "quark_s_monthly": quark_s_monthly,
-        "quark_s_daily": quark_s_daily
+        "quark_s_daily": quark_s_daily,
+        "quark_s_statistics": quark_s_statistics
     }
 
     save = input("\n是否保存配置供下次使用? (y/n): ").strip().lower()
@@ -345,8 +449,10 @@ def main():
         config = interactive_input()
 
     cookie = config.get("cookie", "")
+    user_id = config.get("user_id", "")
     quark_s_monthly = config.get("quark_s_monthly", "")
     quark_s_daily = config.get("quark_s_daily", "")
+    quark_s_statistics = config.get("quark_s_statistics", "")
 
     if not cookie or not quark_s_monthly or not quark_s_daily:
         print("❌ 配置不完整，请重新输入")
@@ -356,7 +462,7 @@ def main():
 
     # 1. 获取月份列表和月报汇总
     print("\n📅 步骤1: 获取月份列表和月报汇总...")
-    months, monthly_records = fetch_month_list(cookie, quark_s_monthly)
+    months, monthly_records, month_ids = fetch_month_list(cookie, quark_s_monthly, user_id)
     print(f"   找到 {len(months)} 个月份")
     print(f"   月报汇总: {len(monthly_records)} 条")
 
@@ -367,18 +473,10 @@ def main():
 
     # 2. 获取每日明细
     all_daily = []
-
-    try:
-        with open("month_ids.json", "r") as f:
-            month_ids = json.load(f)
-    except:
-        month_ids = {}
-
     print("\n📅 步骤2: 获取每日明细...")
     for month in months:
         month_id = month_ids.get(month, "")
-        print(
-            f"\n📊 正在处理 {month}... (ID: {month_id[:8] if month_id else 'N/A'}...)")
+        print(f"\n📊 正在处理 {month}... (ID: {month_id[:8] if month_id else 'N/A'}...)")
 
         if not month_id:
             print("   ❌ 无ID，跳过")
@@ -388,22 +486,54 @@ def main():
         all_daily.extend(daily_records)
         print(f"   明细: {len(daily_records)} 条")
 
-    # 3. 生成文件
-    print("\n💾 步骤3: 生成Excel文件...")
+    # 3. 获取打卡记录
+    all_swiping_cards = []
+    if quark_s_statistics:
+        print("\n📅 步骤3: 获取打卡记录...")
+        daily_by_month = {}
+        for record in all_daily:
+            date_val = record.get("Date", {})
+            if isinstance(date_val, dict):
+                date_str = date_val.get("value", "") or date_val.get("text", "")
+            else:
+                date_str = date_val
+            if date_str:
+                month_key = date_str[:7].replace("/", "-")
+                if month_key not in daily_by_month:
+                    daily_by_month[month_key] = []
+                daily_by_month[month_key].append(record)
+
+        for month, daily_records in daily_by_month.items():
+            print(f"\n📊 正在处理 {month} 的打卡记录...")
+            dates = extract_dates_from_daily(daily_records)
+            if not dates:
+                print("   ❌ 无日期数据，跳过")
+                continue
+            print(f"   出勤日期: {len(dates)} 天")
+            swiping_records = fetch_swiping_card_records(cookie, quark_s_statistics, user_id, month, dates)
+            all_swiping_cards.extend(swiping_records)
+
+    # 4. 生成文件
+    print("\n💾 步骤4: 生成CSV文件...")
 
     month_list_file = f"考勤月份列表_{timestamp}.csv"
     monthly_file = f"考勤月报汇总_{timestamp}.csv"
     daily_file = f"考勤每日明细_{timestamp}.csv"
+    swiping_file = f"考勤打卡记录_{timestamp}.csv"
 
     save_month_list_csv(months, month_list_file)
     save_monthly_csv(monthly_records, monthly_file)
     save_daily_csv(all_daily, daily_file)
+    if all_swiping_cards:
+        save_swiping_card_csv(all_swiping_cards, swiping_file)
 
     print("\n" + "=" * 70)
     print("✅ 全部完成！")
     print(f"   月份列表: {len(months)} 个月")
     print(f"   月报汇总: {len(monthly_records)} 条记录")
     print(f"   每日明细: {len(all_daily)} 条记录")
+    if all_swiping_cards:
+        print(f"   打卡记录: {len(all_swiping_cards)} 条记录")
     print("=" * 70)
 
     input("\n按回车键退出...")
